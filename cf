@@ -1,0 +1,16 @@
+--นับคำ
+SentimentScore = 
+VAR gw = {"happy", "satisfied", "delicious", "amazing", "love", "excellent", "great", "enjoyed", "recommend", "best"}
+VAR bw = {"disappointed", "bad", "terrible", "awful", "hate", "worst", "horrible", "disgusting", "not good", "dislike"}
+
+VAR cg = SUMX(gw,IF(CONTAINSSTRING([Comment],[Value]),1,0))
+VAR cb = SUMX(bw,IF(CONTAINSSTRING([Comment],[Value]),1,0))
+
+RETURN cg - cb
+
+--
+Sentiment Result = 
+IF([SentimentScore] >0,"Positive",
+IF([SentimentScore] <0,"Negative","Neutral"))
+
+Start OF Weak = 'CustomerFeedback'[DateSubmitted] - WEEKDAY('CustomerFeedback'[DateSubmitted],2)+1
