@@ -126,3 +126,69 @@ SWITCH('LoyaltyProgramHistory'[Tier_Simplified],
     "Platinum", 4,
     5
 )
+
+-----------------------------------------------------------------------
+
+Dax
+
+DEFINE
+    MEASURE 'LoyaltyProgramHistory'[Customer Earned Count] = 
+        CALCULATE(
+            COUNT('LoyaltyProgramHistory'[HistoryId]),
+            'LoyaltyProgramHistory'[Action] = "Points Earned"
+        )
+    MEASURE 'LoyaltyProgramHistory'[Median Activity] = 
+        MEDIANX(
+            VALUES('LoyaltyProgramHistory'[CustomerId]),
+            [Customer Earned Count]
+        )
+
+    MEASURE 'LoyaltyProgramHistory'[Avg Days Between Upgrades] = 
+        AVERAGEX(
+            FILTER(
+                'LoyaltyProgramHistory',
+                'LoyaltyProgramHistory'[Action] = "Tier Upgrade"
+            ),
+            VAR cusid = 'LoyaltyProgramHistory'[CustomerId]
+            VAR datetime = 'LoyaltyProgramHistory'[Timestamp]
+            VAR per = 
+                CALCULATE(
+                    MAX('LoyaltyProgramHistory'[Timestamp]),
+                    ALL('LoyaltyProgramHistory'),
+                    'LoyaltyProgramHistory'[CustomerId] = cusid, 
+                    'LoyaltyProgramHistory'[Action] = "Tier Upgrade", 
+                    'LoyaltyProgramHistory'[Timestamp] < datetime
+                )
+            RETURN
+                IF(NOT ISBLANK(per), DATEDIFF(per, datetime, DAY))
+        )
+
+    MEASURE 'LoyaltyProgramHistory'[Avg Days Earn To Redeem] = 
+        AVERAGEX(
+            FILTER(
+                'LoyaltyProgramHistory',
+                'LoyaltyProgramHistory'[Action] = "Points Redeemed"
+            ),
+            VAR CurrentCustomer = 'LoyaltyProgramHistory'[CustomerId]
+            VAR RedeemTime = 'LoyaltyProgramHistory'[Timestamp]
+            VAR LastEarnTime = 
+                CALCULATE(
+                    MAX('LoyaltyProgramHistory'[Timestamp]),
+                    ALL('LoyaltyProgramHistory'),
+                    'LoyaltyProgramHistory'[CustomerId] = CurrentCustomer,
+                    'LoyaltyProgramHistory'[Action] = "Points Earned",
+                    'LoyaltyProgramHistory'[Timestamp] < RedeemTime
+                )
+            RETURN
+                IF(
+                    NOT ISBLANK(LastEarnTime),
+                    VALUE(RedeemTime - LastEarnTime)
+                )
+        )
+
+EVALUATE
+    SUMMARIZECOLUMNS(
+        "Median Earn Activity", [Median Activity],
+        "Avg Days Upgrade", [Avg Days Between Upgrades],
+        "Avg Days Redeem", [Avg Days Earn To Redeem]
+    )
