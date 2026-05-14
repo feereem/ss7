@@ -1,21 +1,7 @@
-let
-    txt = Text.Lower([Comment]),
-    good = {"happy", "satisfied", "delicious", "amazing", "love", "excellent", "great", "enjoyed", "recommend", "best"},
-    bad = {"disappointed", "bad", "terrible", "awful", "hate", "worst", "horrible", "disgusting", "not good", "dislike"},
-    
-    countGood = List.Count(List.Select(good, each Text.Contains(txt, _))),
-    countBad = List.Count(List.Select(bad, each Text.Contains(txt, _))),
-    
-    result = if countGood > countBad then "Positive" 
-             else if countBad > countGood then "Negative" 
-             else "Neutral"
-in
-    result
-------------------------------------------------------------------------------------
 
-Home > New Source > Blank Query
-
-
+Home > 
+ > Blank Query
+### สร้างตาราง
 let
     Source = CustomerFeedback, // ตรวจสอบว่าชื่อตารางหลักของคุณชื่อนี้
     AllComments = Text.Lower(Text.Combine(Source[Comment], " ")),
@@ -36,7 +22,7 @@ let
     Final = Table.TransformColumnTypes(Combined,{{"Count", Int64.Type}})
 in
     Final
-------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
 
 WeekStart = 
 'CustomerFeedback'[DateSubmitted] - WEEKDAY('CustomerFeedback'[DateSubmitted], 2) + 1
@@ -128,22 +114,20 @@ SWITCH('LoyaltyProgramHistory'[Tier_Simplified],
 )
 
 -----------------------------------------------------------------------
-
-Dax
-
 DEFINE
-    MEASURE 'LoyaltyProgramHistory'[Customer Earned Count] = 
+    MEASURE 'LoyaltyProgramHistory'[Customer Earned Count] =
         CALCULATE(
             COUNT('LoyaltyProgramHistory'[HistoryId]),
             'LoyaltyProgramHistory'[Action] = "Points Earned"
         )
-    MEASURE 'LoyaltyProgramHistory'[Median Activity] = 
+    MEASURE 'LoyaltyProgramHistory'[Median Activity] =
         MEDIANX(
             VALUES('LoyaltyProgramHistory'[CustomerId]),
             [Customer Earned Count]
         )
 
-    MEASURE 'LoyaltyProgramHistory'[Avg Days Between Upgrades] = 
+
+    MEASURE 'LoyaltyProgramHistory'[Avg Days Between Upgrades] =
         AVERAGEX(
             FILTER(
                 'LoyaltyProgramHistory',
@@ -151,19 +135,20 @@ DEFINE
             ),
             VAR cusid = 'LoyaltyProgramHistory'[CustomerId]
             VAR datetime = 'LoyaltyProgramHistory'[Timestamp]
-            VAR per = 
+            VAR per =
                 CALCULATE(
                     MAX('LoyaltyProgramHistory'[Timestamp]),
                     ALL('LoyaltyProgramHistory'),
-                    'LoyaltyProgramHistory'[CustomerId] = cusid, 
-                    'LoyaltyProgramHistory'[Action] = "Tier Upgrade", 
+                    'LoyaltyProgramHistory'[CustomerId] = cusid,
+                    'LoyaltyProgramHistory'[Action] = "Tier Upgrade",
                     'LoyaltyProgramHistory'[Timestamp] < datetime
                 )
             RETURN
                 IF(NOT ISBLANK(per), DATEDIFF(per, datetime, DAY))
         )
 
-    MEASURE 'LoyaltyProgramHistory'[Avg Days Earn To Redeem] = 
+
+    MEASURE 'LoyaltyProgramHistory'[Avg Days Earn To Redeem] =
         AVERAGEX(
             FILTER(
                 'LoyaltyProgramHistory',
@@ -171,7 +156,7 @@ DEFINE
             ),
             VAR CurrentCustomer = 'LoyaltyProgramHistory'[CustomerId]
             VAR RedeemTime = 'LoyaltyProgramHistory'[Timestamp]
-            VAR LastEarnTime = 
+            VAR LastEarnTime =
                 CALCULATE(
                     MAX('LoyaltyProgramHistory'[Timestamp]),
                     ALL('LoyaltyProgramHistory'),
@@ -185,10 +170,25 @@ DEFINE
                     VALUE(RedeemTime - LastEarnTime)
                 )
         )
+    MEASURE 'CustomerFeedback'[Comment_Sentiment_Logic] =
+        VAR CurrentComment = SELECTEDVALUE('CustomerFeedback'[Comment])
+       
+        VAR CountGood = SUMX(FILTER('count', 'count'[Category] = "Good"), IF(CONTAINSSTRING(CurrentComment, 'count'[Word]), 1, 0))
+        VAR CountBad = SUMX(FILTER('count', 'count'[Category] = "Bad"), IF(CONTAINSSTRING(CurrentComment, 'count'[Word]), 1, 0))
+       
+        RETURN
+            IF(ISBLANK(CurrentComment), "Neutral",
+                IF(CountGood > CountBad, "Positive",
+                    IF(CountBad > CountGood, "Negative", "Neutral")
+                )
+            )
 
-EVALUATE
+
+EVALUATE(
     SUMMARIZECOLUMNS(
         "Median Earn Activity", [Median Activity],
         "Avg Days Upgrade", [Avg Days Between Upgrades],
         "Avg Days Redeem", [Avg Days Earn To Redeem]
-    )
+    ))
+EVALUATE(
+    TOPN(100, 'CustomerFeedback'))
